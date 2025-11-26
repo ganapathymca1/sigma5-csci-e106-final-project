@@ -75,6 +75,7 @@ library(vcd)
 
 
 titanic <- read_csv("./Titanic_Survival_Data.csv")
+titanic_raw <- read.csv("./Titanic_Survival_Data.csv")
 
 head(titanic)
 ```
@@ -307,3 +308,77 @@ titanic$embarked  <- factor(titanic$embarked)
 
 str(titanic)
 ```
+
+At this point, it is helpful to create dummy variables out of the categorical variables, so that correlation and multicollinearity checks can be done (and so they can be analyzed numerically if necessary).
+
+```{r}
+titanic_work <- titanic_raw
+
+# sex
+# BASE: male
+is_female <- I(titanic_work$sex == 'female') * 1
+titanic_work$is_female <- is_female
+
+# pclass
+# BASE: 1st
+is_2nd_class <- I(titanic_work$pclass == 2) * 1
+titanic_work$is_2nd_class <- is_2nd_class
+is_3rd_class <- I(titanic_work$pclass == 3) * 1
+titanic_work$is_3rd_class <- is_3rd_class
+
+# embarked
+# BASE: Southampton
+is_C_embark <- I(titanic_work$embarked == 'C') * 1
+titanic_work$is_C_embark <- is_C_embark
+is_Q_embark <- I(titanic_work$embarked == 'Q') * 1
+titanic_work$is_Q_embark <- is_Q_embark
+
+# cabin
+# BASE: <no cabin>`
+is_deck_A <- +grepl('A', titanic_work$cabin)
+titanic_work$is_deck_A <- is_deck_A
+is_deck_B <- +grepl('B', titanic_work$cabin)
+titanic_work$is_deck_B <- is_deck_B
+is_deck_C <- +grepl('C', titanic_work$cabin)
+titanic_work$is_deck_C <- is_deck_C
+is_deck_D <- +grepl('D', titanic_work$cabin)
+titanic_work$is_deck_D <- is_deck_D
+is_deck_E <- +grepl('E', titanic_work$cabin)
+titanic_work$is_deck_E <- is_deck_E
+is_deck_F <- +grepl('F', titanic_work$cabin)
+titanic_work$is_deck_F <- is_deck_F
+
+# Citations
+#   - https://stackoverflow.com/questions/57074127/r-return-true-or-false-per-row-if-string-contains-any-of-a-list-of-words
+```
+
+With that done, they can now be analyzed for correlations, and put into a scratchpad-eque model merely for the purposes of `vif()` execution.
+
+```{r}
+titanic_work_df <- data.frame(
+  titanic_work$survived,
+  titanic_work$age,
+  titanic_work$sibsp,
+  titanic_work$parch,
+  titanic_work$fare,
+  titanic_work$is_female,
+  titanic_work$is_2nd_class,
+  titanic_work$is_3rd_class,
+  titanic_work$is_deck_A,
+  titanic_work$is_deck_B,
+  titanic_work$is_deck_C,
+  titanic_work$is_deck_D,
+  titanic_work$is_deck_E,
+  titanic_work$is_deck_F,
+  titanic_work$is_C_embark,
+  titanic_work$is_Q_embark
+)
+cor(titanic_work_df)
+
+mdl_ols <- lm(survived ~ age + sibsp + parch + fare + is_female + is_2nd_class + is_3rd_class + is_deck_A + is_deck_B + is_deck_C + is_deck_D + is_deck_E + is_deck_F + is_C_embark + is_Q_embark, data = titanic_work)
+vif(mdl_ols)
+```
+
+None of the independent variables have a strong correlation with one another. 
+
+In terms of multicollinearity, although the VIF for `is_2nd_class` and `is_3rd_class` are not egregiously high (i.e. greater than 10), they are still notably higher than those VIF values of all the other variables. This is likely from the inclusion of decks, as passengers assigned to a deck were those who could afford cabins, which were more prevalent among the higher-class passengers.
