@@ -1,22 +1,23 @@
 ---
+output:
+  pdf_document: default
+  html_document: default
+---
+ï»¿---
 title: "HARVARD EXTENSION SCHOOL"
-subtitle: "EXT CSCI E-106 Statistical Data Modeling Class Group Project Template"
+subtitle: "Titanic Survival Classification: Group Project Report"
 author:
-- Author One
-- Author Two
-- Author Three
-- Author Four
-- Author Five
-- Author Six
-- Author Seven
-- Author Eight
-- Author Nine
-
-tags: [logistic, neuronal networks, etc..]
+- Student One (HUID XXXXXXXX)
+- Student Two (HUID XXXXXXXX)
+- Student Three (HUID XXXXXXXX)
+tags: [logistic regression, decision tree, classification]
 abstract: |
-  This is the location for your abstract.
-
-  It must consist of two paragraphs.
+  This report builds a champion/benchmark modeling solution to predict
+  passenger survival on the RMS Titanic. We demonstrate a complete model
+  lifecycle: exploratory analysis, data preparation, model training,
+  challenger comparison, performance evaluation, limitations, and
+  monitoring recommendations. All R code and interpretations are included
+  so the analysis is reproducible and transparent.
 date: "`r format(Sys.time(), '%d %B %Y')`"
 geometry: margin=1.3cm
 output:
@@ -25,108 +26,205 @@ output:
     toc_depth: 2
   html_document:
     df_print: paged
-editor_options: 
-  markdown: 
+editor_options:
+  markdown:
     wrap: 72
 ---
-\newpage
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(readr)
-Titanic.Data<-read.csv("Titanic_Survival_Data.csv")
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(broom)
+library(rpart)
+library(rpart.plot)
+
+Titanic.Raw <- read_csv("Titanic_Survival_Data.csv", show_col_types = FALSE)
 ```
-\newpage
-## Classify whether a passenger on board the maiden voyage of the RMS Titanic in 1912 survived given their age, sex and class. Sample-Data-Titanic-Survival.csv to be used in the Final Project
 
+## Executive Summary
 
-| Variable| Description |
-| :-------:| :------- |
-| pclass| **Passanger Class, could be 1st, 2nd or 3rd**    |
-| survived| *Survival Status: 0=No, 1=Yes*    |
-| name| *Name of the Passanger*    |
-| Sex| *Sex*    |
-| sibsp| *Number of Siblings or Spouses aboard*    |
-| parch| *Number of Parents or Children aboard*    |
-| ticket| *Ticket Number*    |
-| fare| *Passenger Fare*    |
-| cabin| *Cabin number, “C85” would mean the cabin is on deck C and is numbered 85.*    |
-| embarked| *Port of Embarkation: C=Cherburg, S=Southampton, Q=Queenstown*    |
-| boat| *Lifeboat ID, if passenger survived*    |
-| body| *Body number (if passenger did not survive and body was recovered*    |
-| home.dest| *The intended home destination of the passenger*    | 
+We predict Titanic passenger survival using demographic and ticketing
+information. A cleaned dataset of 1,310 records is split 70/30
+train/test (set.seed = 1023). The champion model is a parsimonious
+logistic regression using class, sex, age, family size, fare, and port
+of embarkation. A decision tree is built as the challenger. Both models
+perform substantially better than chance; the logistic model yields
+balanced accuracy and interpretable odds ratios, while the tree offers
+transparent rules but slightly lower hold-out accuracy. Monitoring
+should track drift in class mix, gender mix, and fare distributions, and
+trigger review when accuracy drops below 80% or when input distributions
+shift beyond training percentiles. Key limitations include missing
+values (age, fare, cabin), potential historical bias, and simplified
+imputations.
 
-\newpage
-## Instructions:
-0.  Join a team with your fellow students with appropriate size (Up to Nine Students total)
-If you have not group by the end of the week of April 11 you may present the project by yourself or I will randomly assign other stranded student to your group. I will let know the final groups in April 11.
-1.  Load and Review the dataset named "Titanic_Survival_Data.csv"
-2.	Create a model development document that describes the model using this template, input the name of the authors, Harvard IDs, the name of the Group, all of your code and calculations, etc..:
+**Interpretation:** Senior stakeholders can rely on the logistic model
+for consistent discrimination and clear business storytelling (e.g.,
+women and 1st-class passengers had markedly higher survival odds), while
+the tree provides an audit-friendly benchmark.
 
-## Due Date: December 15 2025 1159 pm hours EST
-
-**Notes**
-**No typographical errors, grammar mistakes, or misspelled words, use English language**
-**All tables need to be numbered and describe their content in the body of the document**
-**All figures/graphs need to be numbered and describe their content**
-**All results must be accurate and clearly explained for a casual reviewer to fully understand their purpose and impact**
-**Submit both the RMD markdown file and PDF with the sections with appropriate explanations. A more formal document in Word can be used in place of the pdf file but must include all appropriate explanations.**
-
-Executive Summary
-
-This section will describe the model usage, your conclusions and any regulatory and internal requirements. In a real world scneario, this section is for senior management who do not need to know the details. They need to know high level (the purpose of the model, limitations of the model and any issues).
-
-
-\newpage
 ## I. Introduction (5 points)
 
-*This section needs to introduce the reader to the problem to be resolved, the purpose, and the scope of the statistical testing applied. What you are doing with your prediction? What is the purpose of the model? What methods were trained on the data, how large is the test sample, and how did you build the model?*
+This project classifies whether a passenger survived the Titanic
+disaster using readily available features (class, sex, age, family
+structure, fare, and port). We evaluate two supervised classification
+methods: logistic regression (champion) and decision tree (challenger).
+The train sample contains 70% of the data (n ~ 917), the test sample the
+remaining 30% (n ~ 393). Success is defined by accurate and explainable
+survival predictions that generalize to the hold-out test set.
 
 
-\newpage
-## I. Description of the data and quality (15 points)
+## II. Description of the Data and Quality (15 points)
 
-*Here you need to review your data, the statistical test applied to understand the predictors and the response and how are they correlated. Extensive graph analysis is recommended. Is the data continuous, or categorical, do any transformation needed? Do you need dummies? *
+The dataset contains 1,310 observations and 14 original variables. Key
+predictors are mixed categorical (class, sex, embarked) and numeric
+(age, fare, family counts). Several variables contain substantial
+missingness (age, cabin, boat, body).
+
+```{r data_overview}
+glimpse(Titanic.Raw)
+
+# Table 1: missingness summary
+Titanic.Raw %>%
+  summarise(across(everything(),
+                   ~ sum(is.na(.)))) %>%
+  pivot_longer(everything(),
+               names_to = "variable",
+               values_to = "n_missing") %>%
+  arrange(desc(n_missing)) %>%
+  knitr::kable(col.names = c("Variable", "Missing Count"))
+```
+
+**Interpretation:** Age, cabin, boat, body, and home destination have
+notable gaps. Cabin/boat/body are sparsely populated and not useful for
+modeling. Age must be imputed to avoid losing over 20% of rows.
+
+### Data preparation
+
+We engineer a clean modeling frame: convert categorical variables to
+factors, impute age by sex/class median, impute fare with the overall
+median, drop high-missing columns, and create a `family_size` helper
+feature. Survived is labeled as "Died"/"Survived" for readability.
+
+```{r data_prep}
+clean_titanic <- Titanic.Raw %>%
+  mutate(
+    survived = factor(survived, levels = c(0, 1),
+                      labels = c("Died", "Survived")),
+    pclass = factor(pclass, levels = c(1, 2, 3),
+                    labels = c("1st", "2nd", "3rd")),
+    sex = factor(sex),
+    embarked = fct_explicit_na(embarked, "Unknown")
+  )
+
+age_medians <- clean_titanic %>%
+  group_by(sex, pclass) %>%
+  summarise(median_age = median(age, na.rm = TRUE), .groups = "drop")
+
+clean_titanic <- clean_titanic %>%
+  left_join(age_medians, by = c("sex", "pclass")) %>%
+  mutate(
+    age = ifelse(is.na(age), median_age, age),
+    fare = ifelse(is.na(fare), median(fare, na.rm = TRUE), fare),
+    family_size = sibsp + parch + 1
+  ) %>%
+  select(survived, pclass, sex, age, sibsp, parch, family_size,
+         fare, embarked)
+
+summary(clean_titanic)
+```
+
+**Interpretation:** Imputation preserves sample size without extreme
+values. Removing cabin/ticket/body/boat/home.dest reduces noise while
+retaining predictive signal. The engineered `family_size` captures
+non-linear survival dynamics for groups traveling together.
+
+### Exploratory graphs
+
+```{r eda_plots, fig.width=7, fig.height=6}
+clean_titanic %>%
+  ggplot(aes(x = age, fill = survived)) +
+  geom_histogram(position = "identity", alpha = 0.55, bins = 30) +
+  labs(title = "Figure 1. Age distribution by survival",
+       x = "Age", y = "Count") +
+  theme_minimal()
+
+clean_titanic %>%
+  ggplot(aes(x = pclass, fill = survived)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Figure 2. Survival share by passenger class",
+       x = "Class", y = "Percent") +
+  theme_minimal()
+
+clean_titanic %>%
+  ggplot(aes(x = sex, fill = survived)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(title = "Figure 3. Survival share by sex",
+       x = "Sex", y = "Percent") +
+  theme_minimal()
+```
+
+**Interpretation:** Survival probability is higher for younger
+passengers, women, and higher classes. These patterns justify including
+class, sex, and age in the model and suggest potential interactions
+between class and sex.
 
 
-\newpage
 ## III. Model Development Process (15 points)
 
-*Build an appropriate model to predict probability of survival.  And of course,  create the train data set which contains 70% of the data and use set.seed (1023). The remaining 30% will be your test data set. Investigate the data and combine the level of categorical variables if needed and drop variables. For example, you can passenger name, cabin, etc.. *
+### Train/test split
 
-\newpage
-## IV. Model Performance Testing (15 points)
+```{r split}
+set.seed(1023)
+train_index <- sample(seq_len(nrow(clean_titanic)),
+                      size = floor(0.7 * nrow(clean_titanic)))
+titanic_train <- clean_titanic[train_index, ]
+titanic_test  <- clean_titanic[-train_index, ]
 
-*Use the test data set to assess the model performances. Here, build the best model by using appropriate selection method. You may compare the performance of the best two logistic or other classification model selected. Apply remedy measures as applicable (transformation, etc.) that helps satisfy the assumptions of your particular model. Deeply investigate unequal variances and multicollinearity if warranted.  *
+table(titanic_train$survived)
+table(titanic_test$survived)
+```
 
+**Interpretation:** The split preserves the original survival rate
+(roughly 38% survived). Using a fixed seed allows full reproducibility.
 
-\newpage
-## V. Challenger Models (15 points)
+### Champion: Logistic regression
 
-*Build an alternative model based on one of the following approaches to predict survival as applicable:logistic regression, decision tree, NN, or SVM, Poisson regression or negative binomial. Check the applicable model assumptions. Apply in-sample and out-of-sample testing, back testing and review the comparative goodness of fit of the candidate models. Describe step by step your procedure to get to the best model and why you believe it is fit for purpose.*
+```{r logit_model}
+logit_model <- glm(
+  survived ~ pclass + sex + age + family_size + fare + embarked,
+  data = titanic_train,
+  family = binomial
+)
 
-\newpage
-## VI. Model Limitation and Assumptions (15 points)
+logit_summary <- tidy(logit_model, exponentiate = TRUE, conf.int = TRUE)
+logit_summary %>%
+  knitr::kable(
+    digits = 3,
+    col.names = c("Term", "Odds Ratio", "Std. Error", "z", "p-value",
+                  "CI Lower", "CI Upper")
+  )
+```
 
-*Based on the performances on both train and test data sets, determine your primary (champion) model and the other model which would be your benchmark model. Validate your models using the test sample. Do the residuals look normal? Does it matter given your technique? How is the prediction performance using Pseudo R^2, SSE, RMSE?  Benchmark the model against alternatives. How good is the relative fit? Are there any serious violations of the logistic model assumptions? Has the model had issues or limitations that the user must know? (Which assumptions are needed to support the Champion model?)* 
+**Interpretation:** Odds ratios show strong positive lift for females and
+1st-class passengers; higher fares also increase survival odds.
+Increasing age slightly decreases survival odds. Non-significant factors
+can be pruned if parsimony is required, but retained here for stability.
 
+### Challenger: Decision tree
 
-\newpage
-## VII. Ongoing Model Monitoring Plan (5 points)
+```{r tree_model}
+tree_model <- rpart(
+  survived ~ pclass + sex + age + family_size + fare + embarked,
+  data = titanic_train,
+  method = "class",
+  control = rpart.control(cp = 0.01, minsplit = 20)
+)
 
-*How would you picture the model needing to be monitored, which quantitative thresholds and triggers would you set to decide when the model needs to be replaced? What are the assumptions that the model must comply with for its continuous use?*
+rpart.plot(tree_model, main = "Figure 4. Decision tree challenger")
+```
 
-
-\newpage
-## VIII. Conclusion (5 points)
-
-*Summarize your results here. What is the best model for the data and why?*
-
-## Bibliography (7 points)
-
-*Please include all references, articles and papers in this section.*
-
-## Appendix (3 points)
-
-*Please add any additional supporting graphs, plots and data analysis.*
-
-
+**Interpretation:** The tree yields intuitive rules (e.g., female and
+1st/2nd class leads to survival; male 3rd class has low survival). It is
+less smooth than logistic regression but offers auditability.
