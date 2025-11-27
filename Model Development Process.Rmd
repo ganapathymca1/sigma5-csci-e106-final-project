@@ -68,17 +68,17 @@ This project classifies whether a passenger survived the Titanic
 disaster using readily available features (class, sex, age, family
 structure, fare, and port). We evaluate two supervised classification
 methods: logistic regression (champion) and decision tree (challenger).
-The train sample contains 70% of the data (n ~ 917), the test sample the
+The training sample contains 70% of the data (n ~ 917), the test sample the
 remaining 30% (n ~ 393). Success is defined by accurate and explainable
 survival predictions that generalize to the hold-out test set.
-
 
 ## II. Description of the Data and Quality (15 points)
 
 The dataset contains 1,310 observations and 14 original variables. Key
-predictors are mixed categorical (class, sex, embarked) and numeric
-(age, fare, family counts). Several variables contain substantial
-missingness (age, cabin, boat, body).
+predictors are a mix of categorical (class, sex, and embarked) and numeric
+(age, fare, family counts). Several variables contain missing/null
+values for a notably high number of observations (e.g. age, cabin, boat, and
+body are missing values for more than 20% of observations).
 
 ```{r data_overview}
 glimpse(Titanic.Raw)
@@ -98,12 +98,17 @@ Titanic.Raw %>%
 notable gaps. Cabin/boat/body are sparsely populated and not useful for
 modeling. Age must be imputed to avoid losing over 20% of rows.
 
-### Data preparation
+### Data Preparation
 
-We engineer a clean modeling frame: convert categorical variables to
-factors, impute age by sex/class median, impute fare with the overall
-median, drop high-missing columns, and create a `family_size` helper
-feature. Survived is labeled as "Died"/"Survived" for readability.
+We engineer a clean modeling frame according to the following process.
+
+1. Convert categorical variables to factors,
+2. Impute age by sex/class median,
+3. Impute fare with the overall median,
+4. Drop high-missing columns, and
+5. Create a `family_size` helper feature.
+
+Survived is labeled as "Died"/"Survived" for readability.
 
 ```{r data_prep}
 clean_titanic <- Titanic.Raw %>%
@@ -127,8 +132,7 @@ clean_titanic <- clean_titanic %>%
     fare = ifelse(is.na(fare), median(fare, na.rm = TRUE), fare),
     family_size = sibsp + parch + 1
   ) %>%
-  select(survived, pclass, sex, age, sibsp, parch, family_size,
-         fare, embarked)
+  select(survived, pclass, sex, age, sibsp, parch, family_size, fare, embarked)
 
 summary(clean_titanic)
 ```
@@ -138,7 +142,7 @@ values. Removing cabin/ticket/body/boat/home.dest reduces noise while
 retaining predictive signal. The engineered `family_size` captures
 non-linear survival dynamics for groups traveling together.
 
-### Exploratory graphs
+### Exploratory Graphs
 
 ```{r eda_plots, fig.width=7, fig.height=6}
 clean_titanic %>%
@@ -170,10 +174,9 @@ passengers, women, and higher classes. These patterns justify including
 class, sex, and age in the model and suggest potential interactions
 between class and sex.
 
-
 ## III. Model Development Process (15 points)
 
-### Train/test split
+### Train/Test Split
 
 ```{r split}
 set.seed(1023)
@@ -189,11 +192,11 @@ table(titanic_test$survived)
 **Interpretation:** The split preserves the original survival rate
 (roughly 38% survived). Using a fixed seed allows full reproducibility.
 
-### Champion: Logistic regression
+### Champion: Logistic Regression
 
 ```{r logit_model}
 logit_model <- glm(
-  survived ~ pclass + sex + age + family_size + fare + embarked,
+  survived ~ pclass + sex + age + family_size + embarked,
   data = titanic_train,
   family = binomial
 )
@@ -207,12 +210,13 @@ logit_summary %>%
   )
 ```
 
-**Interpretation:** Odds ratios show strong positive lift for females and
-1st-class passengers; higher fares also increase survival odds.
-Increasing age slightly decreases survival odds. Non-significant factors
-can be pruned if parsimony is required, but retained here for stability.
+**Interpretation:** The resultant model yields a number of clear trends.
 
-### Challenger: Decision tree
+- Odds ratios show strong positive lift for females.
+- Lower classes of passage (i.e. 2nd and 3rd) resulted in lower survival probability.
+- Increasing age slightly decreases survival odds.
+
+### Challenger: Decision Tree
 
 ```{r tree_model}
 tree_model <- rpart(
@@ -226,5 +230,7 @@ rpart.plot(tree_model, main = "Figure 4. Decision tree challenger")
 ```
 
 **Interpretation:** The tree yields intuitive rules (e.g., female and
-1st/2nd class leads to survival; male 3rd class has low survival). It is
-less smooth than logistic regression but offers auditability.
+1st- and 2nd-class passage leads to survival, whereas male and 3rd-class passage
+has low survival). It trades predictions which are not as granular as the
+logit model's probability-based ones in return for superior comprehensibility 
+and auditability.
