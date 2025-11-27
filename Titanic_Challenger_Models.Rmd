@@ -1,0 +1,377 @@
+---
+title: "Titanic Survival – Challenger Models (Logistic Regression & Decision Tree)"
+author: "Orkhon.Kh"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+
+library(tidyverse)
+library(rpart)       # decision tree
+library(rpart.plot)  # tree plotting
+library(pROC)        # ROC / AUC
+library(car)         # VIF for multicollinearity diagnostics
+library(knitr)       # nicely formatted tables
+```
+
+# V. Challenger Models: Logistic Regression and Decision Tree
+
+This section presents two **challenger classification models** for predicting whether a passenger survived the sinking of the RMS Titanic:
+
+- **Logistic regression** (parametric benchmark model)
+- **Classification tree** (non‑parametric regression tree for a binary outcome)
+
+Both models are built on the same cleaned training data set and evaluated on a held‑out test set using in‑sample and out‑of‑sample performance metrics.
+
+## 1. Data Preparation
+
+We start from the Titanic survival data file provided by the instructor, assumed to be in the working directory as `Titanic_Survival_Data.csv`.  We keep the variables that are plausibly useful for prediction and drop high‑cardinality identifiers such as name, ticket, cabin, boat, body and home destination.
+
+```{r load-data}
+titanic_raw <- read.csv("Titanic_Survival_Data.csv")
+
+# Keep core modeling variables
+titanic <- titanic_raw |>
+  select(
+    survived,
+    pclass,
+    sex,
+    age,
+    sibsp,
+    parch,
+    fare,
+    embarked
+  )
+
+str(titanic)
+summary(titanic)
+```
+
+There are missing values in `age`, `fare`, and `embarked`.  For this project, and to keep the challenger models simple and transparent, we restrict attention to **complete cases** on these variables.
+
+```{r complete-cases}
+titanic_complete <- titanic |>
+  drop_na()
+
+# Convert appropriate variables to factors
+titanic_complete <- titanic_complete |>
+  mutate(
+    survived = factor(survived, levels = c(0, 1), labels = c("No", "Yes")),
+    pclass   = factor(pclass, levels = c(1, 2, 3),
+                      labels = c("1st", "2nd", "3rd")),
+    sex      = factor(sex),
+    embarked = factor(embarked)
+  )
+
+dim(titanic_complete)
+summary(titanic_complete)
+```
+
+## 2. Train–Test Split
+
+Following the project instructions, we use a **70% / 30% split** with `set.seed(1023)` to ensure reproducibility.  The **train set** is used for model fitting and selection; the **test set** is used only for final performance assessment.
+
+```{r split-train-test}
+set.seed(1023)
+
+n_total <- nrow(titanic_complete)
+train_index <- sample(1:n_total, size = 0.7 * n_total)
+
+train <- titanic_complete[train_index, ]
+test  <- titanic_complete[-train_index, ]
+
+dim(train)
+dim(test)
+```
+
+## 3. Helper Function: Classification Metrics
+
+To compare challenger models on a common basis, we define a simple helper function that takes:
+
+- the **true outcome** (`actual`, either numeric 0/1 or factor with levels "No"/"Yes"), and  
+- the **predicted survival probability** (`prob` = \(\Pr(\text{Survived} = \text{Yes})\))
+
+and returns:
+
+- confusion matrix at a probability cut‑off (default 0.5)
+- accuracy
+- sensitivity (true positive rate for survivors)
+- specificity (true negative rate for non‑survivors)
+- AUC (area under the ROC curve)
+
+```{r helper-metrics}
+classification_metrics <- function(actual, prob, cutoff = 0.5) {
+  # Convert factor responses to numeric 0/1 with "Yes" as 1
+  if (is.factor(actual)) {
+    # Assume the second level corresponds to "Yes"
+    positive_level <- levels(actual)[2]
+    actual_num <- ifelse(actual == positive_level, 1, 0)
+  } else {
+    actual_num <- actual
+  }
+
+  pred_class_num <- ifelse(prob >= cutoff, 1, 0)
+
+  cm <- table(
+    Predicted = pred_class_num,
+    Actual    = actual_num
+  )
+
+  accuracy <- sum(diag(cm)) / sum(cm)
+
+  # Guard against division by zero in edge cases
+  sens <- ifelse(sum(cm[, "1"]) == 0, NA, cm["1", "1"] / sum(cm[, "1"]))
+  spec <- ifelse(sum(cm[, "0"]) == 0, NA, cm["0", "0"] / sum(cm[, "0"]))
+
+  roc_obj <- roc(response = actual_num, predictor = prob, quiet = TRUE)
+  auc_val <- as.numeric(auc(roc_obj))
+
+  metrics_tbl <- tibble(
+    Accuracy    = accuracy,
+    Sensitivity = sens,
+    Specificity = spec,
+    AUC         = auc_val
+  )
+
+  list(
+    confusion_matrix = cm,
+    metrics          = metrics_tbl
+  )
+}
+```
+
+## 4. Logistic Regression Challenger Model
+
+### 4.1 Model Specification and Variable Selection
+
+We first fit a **full logistic regression model** with all available predictors, and then apply stepwise AIC selection to obtain a more parsimonious challenger model.
+
+```{r logit-fit}
+# Full model with main effects only
+logit_full <- glm(
+  survived ~ pclass + sex + age + sibsp + parch + fare + embarked,
+  family = binomial,
+  data   = train
+)
+
+summary(logit_full)
+```
+
+```{r logit-step}
+# Stepwise selection (both directions) based on AIC
+logit_step <- step(logit_full, direction = "both", trace = FALSE)
+
+summary(logit_step)
+```
+
+The stepwise procedure the strongest predictors such as passenger class, sex, and age, while potentially dropping weaker variables that do not materially improve model fit.
+
+### 4.2 Multicollinearity Check
+
+As a basic diagnostic for multicollinearity, we compute **variance inflation factors (VIFs)** for the selected logistic model.
+
+```{r logit-vif}
+vif(logit_step)
+```
+
+The multicollinearity check confirms that the selected logistic regression model does not suffer from problematic predictor correlation. This supports the validity of the model’s coefficient estimates and ensures that the relationships between predictors and survival outcomes can be interpreted with confidence.
+
+### 4.3 In‑Sample Performance (Train Set)
+
+```{r logit-train-performance}
+# Predicted survival probabilities on the train set
+logit_train_prob <- predict(logit_step, newdata = train, type = "response")
+
+# Evaluate at cut-off = 0.5
+logit_train_eval <- classification_metrics(train$survived, logit_train_prob, cutoff = 0.5)
+
+# Confusion matrix
+logit_train_eval$confusion_matrix
+
+# Summary metrics
+kable(
+  logit_train_eval$metrics,
+  digits = 3,
+  caption = "Logistic Regression – Training Performance (cut-off = 0.5)"
+)
+```
+
+### 4.4 Out‑of‑Sample Performance (Test Set)
+
+```{r logit-test-performance}
+# Predicted probabilities on the test set
+logit_test_prob <- predict(logit_step, newdata = test, type = "response")
+
+logit_test_eval <- classification_metrics(test$survived, logit_test_prob, cutoff = 0.5)
+
+# Confusion matrix
+logit_test_eval$confusion_matrix
+
+# Summary metrics
+kable(
+  logit_test_eval$metrics,
+  digits = 3,
+  caption = "Logistic Regression – Test Performance (cut-off = 0.5)"
+)
+```
+
+The logistic regression model demonstrates strong and stable generalization when evaluated on the test dataset. Test accuracy (0.752) and AUC (0.794) remain close to the training results, indicating minimal overfitting. Sensitivity (0.672) shows the model is reasonably effective at identifying survivors, while specificity (0.800) confirms strong performance in correctly identifying non-survivors. Overall, the logistic regression model maintains consistent predictive ability across data splits and performs reliably as a challenger model.
+
+### 4.5 ROC Curves (Optional Visualization)
+
+```{r logit-roc, fig.height=4.5, fig.width=6}
+roc_train_logit <- roc(response = train$survived, predictor = logit_train_prob, quiet = TRUE)
+roc_test_logit  <- roc(response = test$survived,  predictor = logit_test_prob,  quiet = TRUE)
+
+plot(roc_train_logit, main = "Logistic Regression – ROC Curves")
+lines(roc_test_logit, lty = 2)
+legend(
+  "bottomright",
+  legend = c(
+    paste0("Train AUC = ", round(auc(roc_train_logit), 3)),
+    paste0("Test AUC = ", round(auc(roc_test_logit), 3))
+  ),
+  lty = c(1, 2),
+  bty = "n"
+)
+```
+
+## 5. Decision Tree (Classification Tree) Challenger Model
+
+As a non‑parametric alternative, we build a **classification tree** to model survival as a function of the same set of predictors.  Trees can capture non‑linearities and interaction effects automatically, at the cost of potentially higher variance.
+
+### 5.1 Fit a Full Tree
+
+```{r tree-fit}
+set.seed(1023)
+
+tree_full <- rpart(
+  survived ~ pclass + sex + age + sibsp + parch + fare + embarked,
+  data   = train,
+  method = "class",
+  control = rpart.control(cp = 0.001)   # small cp to allow a reasonably large tree
+)
+
+# Complexity parameter table (cross‑validated error)
+printcp(tree_full)
+```
+
+```{r tree-plot-full, fig.height=5.5, fig.width=7}
+rpart.plot(
+  tree_full,
+  type = 2,
+  extra = 104,             # display class, prob, and percentage of observations
+  fallen.leaves = TRUE,
+  main = "Full Classification Tree – Titanic Survival"
+)
+```
+
+### 5.2 Prune the Tree Using Cross‑Validation
+
+We use the cross‑validated **relative error** (`xerror`) from the CP table to select a simpler subtree with better generalization.
+
+```{r tree-prune}
+# Choose the cp value that minimizes cross-validated error
+best_cp <- tree_full$cptable[which.min(tree_full$cptable[, "xerror"]), "CP"]
+best_cp
+
+tree_pruned <- prune(tree_full, cp = best_cp)
+
+tree_pruned
+```
+
+```{r tree-plot-pruned, fig.height=5.5, fig.width=7}
+rpart.plot(
+  tree_pruned,
+  type = 2,
+  extra = 104,
+  fallen.leaves = TRUE,
+  main = "Pruned Classification Tree – Titanic Survival"
+)
+```
+
+### 5.3 In‑Sample Performance (Train Set)
+
+```{r tree-train-performance}
+# Predicted class probabilities for the "Yes" class
+tree_train_prob <- predict(tree_pruned, newdata = train, type = "prob")[, "Yes"]
+
+tree_train_eval <- classification_metrics(train$survived, tree_train_prob, cutoff = 0.5)
+
+# Confusion matrix
+tree_train_eval$confusion_matrix
+
+# Summary metrics
+kable(
+  tree_train_eval$metrics,
+  digits = 3,
+  caption = "Classification Tree – Training Performance (cut-off = 0.5)"
+)
+```
+
+### 5.4 Out‑of‑Sample Performance (Test Set)
+
+```{r tree-test-performance}
+tree_test_prob <- predict(tree_pruned, newdata = test, type = "prob")[, "Yes"]
+
+tree_test_eval <- classification_metrics(test$survived, tree_test_prob, cutoff = 0.5)
+
+# Confusion matrix
+tree_test_eval$confusion_matrix
+
+# Summary metrics
+kable(
+  tree_test_eval$metrics,
+  digits = 3,
+  caption = "Classification Tree – Test Performance (cut-off = 0.5)"
+)
+```
+
+### 5.5 ROC Curves (Optional Visualization)
+
+```{r tree-roc, fig.height=4.5, fig.width=6}
+roc_train_tree <- roc(response = train$survived, predictor = tree_train_prob, quiet = TRUE)
+roc_test_tree  <- roc(response = test$survived,  predictor = tree_test_prob,  quiet = TRUE)
+
+plot(roc_train_tree, main = "Classification Tree – ROC Curves")
+lines(roc_test_tree, lty = 2)
+legend(
+  "bottomright",
+  legend = c(
+    paste0("Train AUC = ", round(auc(roc_train_tree), 3)),
+    paste0("Test AUC = ", round(auc(roc_test_tree), 3))
+  ),
+  lty = c(1, 2),
+  bty = "n"
+)
+```
+
+## 6. Challenger Model Comparison
+
+Finally, we summarize the key performance metrics for both challenger models side‑by‑side on the **test set**.
+
+```{r compare-models}
+challenger_comparison <- bind_rows(
+  logit_test_eval$metrics  |> mutate(Model = "Logistic Regression", Split = "Test"),
+  tree_test_eval$metrics   |> mutate(Model = "Classification Tree", Split = "Test")
+) |>
+  relocate(Model, Split)
+
+kable(
+  challenger_comparison,
+  digits = 3,
+  caption = "Challenger Models – Test Set Performance Comparison"
+)
+```
+
+Both challenger models—logistic regression and the classification tree—perform reasonably well on the test set, but the logistic regression model shows consistently stronger and more stable performance. It achieves a slightly higher accuracy (0.752 vs. 0.745) and a notably higher AUC (0.794 vs. 0.732), indicating superior ability to discriminate between survivors and non-survivors. Additionally, logistic regression exhibits less performance drop from training to testing, suggesting better generalization and lower overfitting.
+
+While the classification tree offers intuitive, rule-based interpretability, this comes at the cost of reduced predictive power. Based on overall accuracy, sensitivity/specificity balance, and AUC, the logistic regression model is the preferred challenger model and should be selected as the stronger benchmark for comparison with the project’s primary - champion model.
