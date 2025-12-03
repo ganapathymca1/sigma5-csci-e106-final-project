@@ -67,36 +67,36 @@ If you have not group by the end of the week of April 11 you may present the pro
 
 Let's firstly important the libraries we will be using as well as importing the dataset.
 It looks like the half the dataset is composed of character variables and the other half are doubles. pclass and survived and are numeric but should be treated as categorical variables due to the fact that pclass has just three possible values and survived has just two. Additionally body just corresponds to essentially an ID number if a person didn't survive and should be treated as an identifier variable rather than a true numeric one.
+
 ```{r}
 library(dplyr)
 library(ggplot2)
 library(vcd)
 
 
-titanic <- read_csv("/Users/Anjan/Downloads/Titanic_Survival_Data_and_Template/Titanic_Survival_Data.csv")
+titanic <- read_csv("./Titanic_Survival_Data.csv")
+titanic_raw <- read.csv("./Titanic_Survival_Data.csv")
 
 head(titanic)
 ```
 
 ##### Numerical Summary 
 
-Let's look at summary to quickly look at the statistcal percentiles for each variable
+Let's look at summary to quickly look at the statistical percentiles for each variable.
+
 ```{r}
 summary(titanic)
-
 ```
 
 This summary is only really useful for age, sibsp, parch, and fare as the other 3 double variables aren't truly numeric data quantities. Age spans from essentially newborn to age 80 with the median and mean both being around 28-29 years. Most of the passengers were in between 21 and 39 years old. It looks like most passengers were travelling alone or with their spouse. Most didn't have parents or children with them although a few had large families with them.
 
 ##### Missing variables
 
-
 ```{r}
 colSums(is.na(titanic))
 ```
 
 Looking at missing values, body has the majority missing with 1189/1310 being not recorded. Cabin, boat, and home.dest have a lot of missing data points. Body, Cabin, Boat, and home.dest have a large amount of missing points and shouldn't be considered for statistical analysis. The remainder of categories have a small amount of missing values and can be considered although age should be inspected to see if it is worth including given it has 264 missing values and the rest have just 1 or 2. 
-
 
 ##### Count Distributions for Passenger Class, Sex, and Point of Embarkation (bar graphs)
 
@@ -118,7 +118,6 @@ ggplot(titanic %>% filter(!is.na(embarked)), aes(x = embarked)) +
   geom_bar() +
   labs(title = "Port of Embarkation",
        x = "Embarked", y = "Count")
-
 ```
 
 In the plot for pclass we can see that the majority are from class 3 with it having more than double that of class 1. Class 1 and 2 seem to have a similar number at around 300 while class seems to have around 700.
@@ -126,7 +125,6 @@ In the plot for pclass we can see that the majority are from class 3 with it hav
 It looks like there were a lot more male travellers at around 850, while female travlelers numbered around just 475. This could prove a useful point to know when looking at fatality rates as the gender ratio is quite disparate. 
 
 The most popular embarkation point was by far Southhampton at about 900 travellers while Cherburg has about 250 followed by Queenstown with the least at just about 125.
-
 
 ##### Histograms of Age Distributions and Fare (histograms)
 
@@ -140,16 +138,16 @@ ggplot(titanic, aes(x = age)) +
 ggplot(titanic, aes(x = fare)) +
   geom_histogram(bins = 30) +
   labs(title = "Fare Distribution (Skewed)")
-
 ```
-Age looks skewed right with the biggest block of travllers being in their 20s a large amount of travelers also in their 30s. There weren't as many travellers with ages greater than 40 and less than 18. 
+
+Age looks skewed right with the biggest block of travelers being in their 20s a large amount of travelers also in their 30s. There weren't as many travelers with ages greater than 40 and less than 18. 
 
 The majority of fares were less than 50 pounds with the bulk being around 10-20 pounds. There are some extreme outliers with a cluster at about 150, one at 225, and one quite far at around over 500 pounds. The majority of fares were on the lower end and this makes sense with what we know about 3rd class being the bulk of the passengers.
 
-
 ##### Histograms of Siblings/Spouses and Parents/Children aboard (histograms)
 
-Let's look at histograms for sibsp and parch to see how roughly how many siblings/spouses and parents/children each passenger had. 
+Let's look at histograms for `sibsp` and parch to see how roughly how many siblings/spouses and parents/children each passenger had. 
+
 ```{r}
 ggplot(titanic, aes(x = sibsp)) +
   geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +
@@ -164,10 +162,10 @@ ggplot(titanic, aes(x = parch)) +
 
 It looks like most travelers were on their own with the majority in both categories reporting zero. If they did have parents or children aboard most had less than 2. It seemed that most travelers were also alone at about 900 with about 325 having their spouse or a sibling aboard.
 
-
 ##### Survival proportion by Pclass and Sex (stacked barcharts)
 
 Let's look at two stacked barcharts that will illustrate key information. We know from historical records that women and children were evacuated first on lifeboats so we expect that trend to show up. We also expect to see a difference in survival by passenger class due to both the larger number of 3rd class passengers as well as potential preferential treatment to 1st class passengers.
+
 ```{r}
 ggplot(titanic, aes(x = pclass, fill = factor(survived))) +
   geom_bar(position = "fill") +
@@ -186,7 +184,6 @@ As can be seen there is a clear difference in survival rates by class with rates
 
 Additionally there is a massive gender survival disparity with females at almost a 75% survival rate versus just about 20% for males. The bulk of the passengers were also males indicating a very large death toll for males with seemingly most lifeboats being allocated to female passengers and mostly those in 1st class. 
 
-
 ##### Gender Proportion by Passenger Class (stacked barcharts)
 
 Let's see what proportion each gender makes up in each passenger class.
@@ -204,10 +201,10 @@ ggplot(titanic %>% filter(!is.na(sex), !is.na(pclass)),
 
 In looking at the gender split of passenger class by gender, we can see that 1st class was close to a 50-50 gender split whereas 3rd class was closer to 70% males. This means that we should expect to see a very high survival rate for women in 1st class and a very high death toll for men in 3rd class.
 
-
 ##### Survival Rate by Gender split by Passenger Class (stacked barcharts)
 
 Let's look at survival rate split by gender and also split by class.
+
 ```{r}
 titanic %>%
   filter(!is.na(sex), !is.na(pclass), !is.na(survived)) %>%   # remove NAs
@@ -222,22 +219,20 @@ titanic %>%
     labs(title = "Survival Rate by Gender Within Each Passenger Class",
          y = "Proportion Survived",
          x = "Gender")
-
-
 ```
 
-Gender is the strongest predictor of survival — females consistently survived at much higher rates.
-Passenger class heavily moderates this effect:
-1st class women had nearly universal survival.
-3rd class women had only about a 50% chance.
-Men in all classes had low survival, particularly in 3rd class.
+- Gender is the strongest predictor of survival — females consistently survived at much higher rates.
+- Passenger class heavily moderates this effect:
+- 1st class women had nearly universal survival.
+- 3rd class women had only about a 50% chance.
+- Men in all classes had low survival, particularly in 3rd class.
 
 This supports the historical “women and children first” policy and the structural disadvantages faced by 3rd-class passengers during evacuation.
-
 
 ##### Survival by Embarkation Port (stacked barchart)
 
 Let's look at survival rate by embarkation port to see if there is a relationship.
+
 ```{r}
 ggplot(titanic %>% filter(!is.na(embarked), !is.na(survived)),
 aes(x=embarked, fill=factor(survived))) +
@@ -247,10 +242,10 @@ aes(x=embarked, fill=factor(survived))) +
 
 It looks like Cherburg has a very high survival rate, much higher than both Queenstown and Southampton. Cherburg passengers had a greater than 50% chance of survival while the other ports were at just around 37%. This is a noticeable result although the disparity isn't as strong as some of the other predictor variables.
 
-
 ##### Age Distributions by Survival (boxplots)
 
 Let's see if age has any noticeable relationship.
+
 ```{r}
 ggplot(titanic %>% filter(!is.na(age), !is.na(survived)),
        aes(x = factor(survived), y = age)) +
@@ -279,23 +274,24 @@ Families with 4 people seem to have the highest rate. Families of 2 and 3 also h
 ##### Side by Side scatterplots
 
 Let's look at scatterplots of each truly numerical variable side by side.
+
 ```{r}
 pairs(~ age + fare + sibsp + parch, data=titanic)
 ```
 
-It looks like age and fare don't have a noticeable relationship with sibsp and parch seeming to have a positive correlation which makes sense as some groups of large travelers could have been travelling together.
-
+It looks like age and fare don't have a noticeable relationship with `sibsp` and parch seeming to have a positive correlation which makes sense as some groups of large travelers could have been travelling together.
 
 ##### Survived by Pclass and Survived by Sex (mosaic plots)
 
-Let's look at mosaic plots of look at the correlation betwen Pclass and Sex with Survived as these appeared to be the most significant predictor variables from the above analysis.
+Let's look at mosaic plots of look at the correlation between `Pclass` and `Sex` with Survived as these appeared to be the most significant predictor variables from the above analysis.
+
 ```{r}
 mosaic(~ pclass + survived, data = titanic, shade = TRUE)
 mosaic(~ sex + survived, data = titanic, shade = TRUE)
 ```
 
-The size of each rectangle corresponds to the number of passengers in that category.
-The color shows whether more or fewer passengers were observed than expected under a model of independence.
+- The size of each rectangle corresponds to the number of passengers in that category.
+- The color shows whether more or fewer passengers were observed than expected under a model of independence.
 
 The first mosaic plot shows a strong association between passenger class and survival (χ² test p < 2.22e-16). First-class passengers survived at rates much higher than expected, while third-class passengers had a disproportionately high death rate. Second-class passengers were close to the expected pattern. These residual patterns indicate that socioeconomic status, represented by passenger class, was a major determinant of survival on the Titanic.
 
@@ -312,3 +308,77 @@ titanic$embarked  <- factor(titanic$embarked)
 
 str(titanic)
 ```
+
+At this point, it is helpful to create dummy variables out of the categorical variables, so that correlation and multicollinearity checks can be done (and so they can be analyzed numerically if necessary).
+
+```{r}
+titanic_work <- titanic_raw
+
+# sex
+# BASE: male
+is_female <- I(titanic_work$sex == 'female') * 1
+titanic_work$is_female <- is_female
+
+# pclass
+# BASE: 1st
+is_2nd_class <- I(titanic_work$pclass == 2) * 1
+titanic_work$is_2nd_class <- is_2nd_class
+is_3rd_class <- I(titanic_work$pclass == 3) * 1
+titanic_work$is_3rd_class <- is_3rd_class
+
+# embarked
+# BASE: Southampton
+is_C_embark <- I(titanic_work$embarked == 'C') * 1
+titanic_work$is_C_embark <- is_C_embark
+is_Q_embark <- I(titanic_work$embarked == 'Q') * 1
+titanic_work$is_Q_embark <- is_Q_embark
+
+# cabin
+# BASE: <no cabin>`
+is_deck_A <- +grepl('A', titanic_work$cabin)
+titanic_work$is_deck_A <- is_deck_A
+is_deck_B <- +grepl('B', titanic_work$cabin)
+titanic_work$is_deck_B <- is_deck_B
+is_deck_C <- +grepl('C', titanic_work$cabin)
+titanic_work$is_deck_C <- is_deck_C
+is_deck_D <- +grepl('D', titanic_work$cabin)
+titanic_work$is_deck_D <- is_deck_D
+is_deck_E <- +grepl('E', titanic_work$cabin)
+titanic_work$is_deck_E <- is_deck_E
+is_deck_F <- +grepl('F', titanic_work$cabin)
+titanic_work$is_deck_F <- is_deck_F
+
+# Citations
+#   - https://stackoverflow.com/questions/57074127/r-return-true-or-false-per-row-if-string-contains-any-of-a-list-of-words
+```
+
+With that done, they can now be analyzed for correlations, and put into a scratchpad-eque model merely for the purposes of `vif()` execution.
+
+```{r}
+titanic_work_df <- data.frame(
+  titanic_work$survived,
+  titanic_work$age,
+  titanic_work$sibsp,
+  titanic_work$parch,
+  titanic_work$fare,
+  titanic_work$is_female,
+  titanic_work$is_2nd_class,
+  titanic_work$is_3rd_class,
+  titanic_work$is_deck_A,
+  titanic_work$is_deck_B,
+  titanic_work$is_deck_C,
+  titanic_work$is_deck_D,
+  titanic_work$is_deck_E,
+  titanic_work$is_deck_F,
+  titanic_work$is_C_embark,
+  titanic_work$is_Q_embark
+)
+cor(titanic_work_df)
+
+mdl_ols <- lm(survived ~ age + sibsp + parch + fare + is_female + is_2nd_class + is_3rd_class + is_deck_A + is_deck_B + is_deck_C + is_deck_D + is_deck_E + is_deck_F + is_C_embark + is_Q_embark, data = titanic_work)
+vif(mdl_ols)
+```
+
+None of the independent variables have a strong correlation with one another. 
+
+In terms of multicollinearity, although the VIF for `is_2nd_class` and `is_3rd_class` are not egregiously high (i.e. greater than 10), they are still notably higher than those VIF values of all the other variables. This is likely from the inclusion of decks, as passengers assigned to a deck were those who could afford cabins, which were more prevalent among the higher-class passengers.
