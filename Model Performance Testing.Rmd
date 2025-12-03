@@ -137,7 +137,7 @@ library(car)
 # VIF for the stepwise-selected model
 vif_values <- vif(logit_step)
 vif_table <- data.frame(
-  Predictor = names(vif_values),
+  Predictor = rownames(vif_values),
   VIF = vif_values
 )
 
