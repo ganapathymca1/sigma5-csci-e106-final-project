@@ -329,7 +329,7 @@ tree_cm$byClass
 
 #### Performance Metrics Comparison
 
-```{r metrics_comparison}
+```{r metrics_comparison, fig.width=7, fig.height=6, fig.align='left'}
 metrics_comparison <- data.frame(
   Model = c("Logistic Regression", "Decision Tree"),
   Accuracy = c(logit_cm$overall["Accuracy"], tree_cm$overall["Accuracy"]),
@@ -348,7 +348,7 @@ metrics_comparison %>%
 
 #### ROC Curve and AUC
 
-```{r roc_auc, fig.width=7, fig.height=6}
+```{r roc_auc, fig.width=7, fig.height=6, fig.align='left'}
 logit_roc <- roc(titanic_test$survived, logit_pred_prob, levels = c("Died", "Survived"))
 logit_auc <- auc(logit_roc)
 
@@ -387,7 +387,7 @@ cat("Hosmer-Lemeshow p-value:", round(hl_test$p.value, 4), "\n")
 
 #### Residual Analysis
 
-```{r residual_plot, fig.width=7, fig.height=5}
+```{r residual_plot, fig.width=7, fig.height=5, fig.align='left'}
 residuals_dev <- residuals(logit_step, type = "deviance")
 
 plot(fitted(logit_step), residuals_dev,
