@@ -461,6 +461,206 @@ for purpose.
 
 ## Appendix (3 points)
 
-- Additional exploratory plots (boxplots, mosaic plots, and correlation
-  checks) are available in the EDA code chunks above. Adjust binning and
-  facetting as needed for presentation.
+### A1. Additional Exploratory Data Analysis
+```{r comment="", echo=FALSE}
+ggplot(clean_titanic, aes(x = survived, y = age, fill = survived)) +
+geom_boxplot(alpha = 0.7) +
+labs(title = "Appendix Figure A1. Age by Survival Status",
+x = "Survival", y = "Age") +
+theme_minimal() +
+theme(legend.position = "none")
+
+```
+
+```{r comment="", echo=FALSE}
+ggplot(clean_titanic, aes(x = survived, y = fare, fill = survived)) +
+geom_boxplot(alpha = 0.7) +
+coord_cartesian(ylim = c(0, quantile(clean_titanic$fare, 0.95, na.rm = TRUE))) +
+labs(title = "Appendix Figure A2. Fare by Survival Status (Truncated at 95th Percentile)",
+x = "Survival", y = "Fare") +
+theme_minimal() +
+theme(legend.position = "none")
+
+```
+
+```{r comment="", echo=FALSE}
+clean_titanic %>%
+count(pclass, sex, survived) %>%
+ggplot(aes(x = pclass, y = n, fill = survived)) +
+geom_col(position = "fill") +
+facet_wrap(~ sex) +
+scale_y_continuous(labels = scales::percent_format()) +
+labs(title = "Appendix Figure A3. Survival Share by Class and Sex",
+x = "Passenger Class", y = "Percent") +
+theme_minimal()
+
+```
+
+```{r comment="", echo=FALSE}
+num_vars <- clean_titanic %>%
+dplyr::select(age, sibsp, parch, family_size, fare) %>%
+na.omit()
+
+corr_mat <- cor(num_vars)
+
+corr_df <- as.data.frame(as.table(corr_mat))
+names(corr_df) <- c("Var1", "Var2", "Correlation")
+
+ggplot(corr_df, aes(x = Var1, y = Var2, fill = Correlation)) +
+geom_tile() +
+scale_fill_gradient2(limits = c(-1, 1)) +
+labs(title = "Appendix Figure A4. Correlation Heatmap of Numeric Predictors",
+x = "", y = "") +
+theme_minimal()
+
+```
+
+```{r comment="", echo=FALSE}
+comment_text <- paste(
+"Interpretation (EDA): The additional plots confirm strong differences",
+"in age and fare distributions across survival groups and highlight",
+"interaction patterns between class and sex. The correlation heatmap",
+"shows only moderate correlations among numeric predictors, which is",
+"consistent with the low VIF values reported in the main text."
+)
+
+cat(strwrap(comment_text, width = 70), sep = "\n")
+
+```
+
+### A2. Detailed Confusion Matrices and Threshold Sensitivity
+```{r comment="", echo=FALSE}
+if (!require(knitr)) install.packages("knitr", repos="https://cloud.r-project.org")
+library(knitr)
+# Recreate predictions if needed
+
+logit_pred_prob <- predict(logit_step, newdata = titanic_test, type = "response")
+logit_pred_class <- ifelse(logit_pred_prob > 0.5, "Survived", "Died")
+logit_pred_class <- factor(logit_pred_class, levels = c("Died", "Survived"))
+
+tree_pred_class <- predict(tree_model, newdata = titanic_test, type = "class")
+
+logit_tab <- table(Prediction = logit_pred_class, Reference = titanic_test$survived)
+tree_tab  <- table(Prediction = tree_pred_class,  Reference = titanic_test$survived)
+
+kable(logit_tab, caption = "Appendix Table A1. Confusion Matrix – Logistic Regression (Cutoff = 0.50)")
+kable(tree_tab,  caption = "Appendix Table A2. Confusion Matrix – Decision Tree")
+
+```
+
+```{r comment="", echo=FALSE}
+threshold_grid <- seq(0.2, 0.8, by = 0.05)
+
+calc_metrics <- function(thresh) {
+pred_class <- ifelse(logit_pred_prob > thresh, "Survived", "Died")
+pred_class <- factor(pred_class, levels = c("Died", "Survived"))
+tab <- table(pred_class, titanic_test$survived)
+
+TP <- tab["Survived", "Survived"]
+TN <- tab["Died",     "Died"]
+FP <- tab["Survived", "Died"]
+FN <- tab["Died",     "Survived"]
+
+acc  <- (TP + TN) / sum(tab)
+sens <- TP / (TP + FN)
+spec <- TN / (TN + FP)
+
+data.frame(threshold = thresh,
+accuracy  = acc,
+sensitivity = sens,
+specificity = spec)
+}
+
+threshold_df <- do.call(rbind, lapply(threshold_grid, calc_metrics))
+
+threshold_df %>%
+pivot_longer(cols = c("accuracy", "sensitivity", "specificity"),
+names_to = "metric", values_to = "value") %>%
+ggplot(aes(x = threshold, y = value, linetype = metric)) +
+geom_line() +
+ylim(0, 1) +
+labs(title = "Appendix Figure A5. Logistic Regression: Threshold Sensitivity",
+x = "Classification Threshold", y = "Metric Value") +
+theme_minimal()
+
+```
+
+```{r comment="", echo=FALSE}
+comment_text <- paste(
+"Interpretation (Thresholds): Varying the cutoff between 0.20 and 0.80",
+"shows the usual trade-off between sensitivity and specificity. The",
+"default 0.50 threshold achieves a good balance, but alternative",
+"cutoffs could be chosen if business priorities required fewer false",
+"negatives or fewer false positives."
+)
+
+cat(strwrap(comment_text, width = 70), sep = "\n")
+
+```
+
+### A3. Additional ROC / AUC Details
+```{r comment="", echo=FALSE}
+logit_roc <- roc(titanic_test$survived, logit_pred_prob, levels = c("Died", "Survived"))
+logit_auc <- auc(logit_roc)
+
+tree_pred_prob <- predict(tree_model, newdata = titanic_test, type = "prob")[, "Survived"]
+tree_roc <- roc(titanic_test$survived, tree_pred_prob, levels = c("Died", "Survived"))
+tree_auc <- auc(tree_roc)
+
+roc_df <- data.frame(
+Model = c("Logistic Regression", "Decision Tree"),
+AUC   = c(as.numeric(logit_auc), as.numeric(tree_auc))
+)
+
+kable(roc_df, digits = 3,
+caption = "Appendix Table A3. Area Under the ROC Curve (AUC) by Model")
+
+```
+
+```{r comment="", echo=FALSE}
+comment_text <- paste(
+"Interpretation (AUC): Both models substantially outperform random",
+"classification, with AUC values around 0.80. The logistic regression",
+"shows a slightly higher AUC than the decision tree, which supports its",
+"selection as the champion model in the main text."
+)
+
+cat(strwrap(comment_text, width = 70), sep = "\n")
+
+```
+
+### A4. Reproducibility Notes
+```{r comment="", echo=FALSE}
+comment_text <- paste(
+"Reproducibility: All results in the report can be regenerated by",
+"running this R Markdown document from top to bottom. Key modeling",
+"choices include the 70/30 train/test split with set.seed(1023),",
+"median imputations for age and fare, and the predictor set used in",
+"the logistic regression and decision tree. This appendix collects",
+"supporting plots and tables that were omitted from the main body",
+"for brevity but may be helpful for technical reviewers."
+)
+
+cat(strwrap(comment_text, width = 70), sep = "\n")
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
