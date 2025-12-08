@@ -1,6 +1,6 @@
 ---
-title: "HARVARD EXTENSION SCHOOL"
-subtitle: "Titanic Survival Classification: Group Project Report"
+title: "HES CSCI E-106 Statistical Data Modeling (Fall 2025 Semester)"
+subtitle: "Titanic Survival Classification: Group 5 (Sigma 5) Project Report"
 author:
 - Aljazi Al Maghlouth
 - Anjan Chakravarti
