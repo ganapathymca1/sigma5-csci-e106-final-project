@@ -462,8 +462,8 @@ This project developed and evaluated statistical classification models to predic
 
 The decision tree served as a transparent challenger model, offering rule-based explanations",
 "that align with well-known Titanic survival dynamics (e.g., higher survival rates among women",
-"and passengers in first class). Although the tree performed competitively—with accuracy and",
-"AUC close to the logistic regression—it exhibited slightly lower generalization performance on",
+"and passengers in first class). Although the tree performed competitively with accuracy and",
+"AUC close to the logistic regression it exhibited slightly lower generalization performance on",
 "the hold-out test set, justifying its role as a benchmark rather than the primary model.
 
 Overall, the modeling framework demonstrates that demographic and ticket-related features",
