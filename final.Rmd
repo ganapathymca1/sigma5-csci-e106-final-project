@@ -151,19 +151,25 @@ clean_titanic %>%
   theme_minimal()
 
 clean_titanic %>%
+  filter(!is.na(pclass), !is.na(survived)) %>%
   ggplot(aes(x = pclass, fill = survived)) +
   geom_bar(position = "fill") +
   scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = "Figure 2. Survival share by passenger class",
-       x = "Class", y = "Percent") +
+  labs(
+    title = "Figure 2. Survival share by passenger class",
+    x = "Class", y = "Percent"
+  ) +
   theme_minimal()
 
 clean_titanic %>%
+  filter(!is.na(sex), !is.na(survived)) %>%
   ggplot(aes(x = sex, fill = survived)) +
   geom_bar(position = "fill") +
   scale_y_continuous(labels = scales::percent_format()) +
-  labs(title = "Figure 3. Survival share by sex",
-       x = "Sex", y = "Percent") +
+  labs(
+    title = "Figure 3. Survival share by sex",
+    x = "Sex", y = "Percent"
+  ) +
   theme_minimal()
 ```
 
@@ -463,36 +469,55 @@ for purpose.
 
 ### A1. Additional Exploratory Data Analysis
 ```{r comment="", echo=FALSE}
-ggplot(clean_titanic, aes(x = survived, y = age, fill = survived)) +
-geom_boxplot(alpha = 0.7) +
-labs(title = "Appendix Figure A1. Age by Survival Status",
-x = "Survival", y = "Age") +
-theme_minimal() +
-theme(legend.position = "none")
-
-```
-
-```{r comment="", echo=FALSE}
-ggplot(clean_titanic, aes(x = survived, y = fare, fill = survived)) +
-geom_boxplot(alpha = 0.7) +
-coord_cartesian(ylim = c(0, quantile(clean_titanic$fare, 0.95, na.rm = TRUE))) +
-labs(title = "Appendix Figure A2. Fare by Survival Status (Truncated at 95th Percentile)",
-x = "Survival", y = "Fare") +
-theme_minimal() +
-theme(legend.position = "none")
+clean_titanic %>%
+  filter(!is.na(survived), !is.na(age)) %>%
+  ggplot(aes(x = survived, y = age, fill = survived)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Appendix Figure A1. Age by Survival Status",
+    x = "Survival", 
+    y = "Age"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
 
 ```
 
 ```{r comment="", echo=FALSE}
 clean_titanic %>%
-count(pclass, sex, survived) %>%
-ggplot(aes(x = pclass, y = n, fill = survived)) +
-geom_col(position = "fill") +
-facet_wrap(~ sex) +
-scale_y_continuous(labels = scales::percent_format()) +
-labs(title = "Appendix Figure A3. Survival Share by Class and Sex",
-x = "Passenger Class", y = "Percent") +
-theme_minimal()
+  filter(!is.na(survived), !is.na(fare)) %>%
+  ggplot(aes(x = survived, y = fare, fill = survived)) +
+  geom_boxplot(alpha = 0.7) +
+  coord_cartesian(
+    ylim = c(
+      0,
+      quantile(clean_titanic$fare, 0.95, na.rm = TRUE)
+    )
+  ) +
+  labs(
+    title = "Appendix Figure A2. Fare by Survival Status (Truncated at 95th Percentile)",
+    x = "Survival", 
+    y = "Fare"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+```{r comment="", echo=FALSE}
+clean_titanic %>%
+  filter(!is.na(pclass), !is.na(sex), !is.na(survived)) %>%
+  count(pclass, sex, survived) %>%
+  ggplot(aes(x = pclass, y = n, fill = survived)) +
+  geom_col(position = "fill") +
+  facet_wrap(~ sex) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Appendix Figure A3. Survival Share by Class and Sex",
+    x = "Passenger Class", 
+    y = "Percent"
+  ) +
+  theme_minimal()
 
 ```
 
