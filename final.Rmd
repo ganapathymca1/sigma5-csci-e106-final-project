@@ -435,13 +435,29 @@ tidy(logit_step, exponentiate = TRUE, conf.int = TRUE) %>%
 
 - **Data drift:** Track distributions of `pclass`, `sex`, `fare`, and
   `family_size`; trigger review if shifts exceed training
-  5th/95th percentiles.  
+  5th/95th percentiles. If a feature drifts for one period, run a data
+  quality audit and back-test with a challenger model. If drift persists
+  for two consecutive periods, refit the logistic regression on the most
+  recent labeled data while keeping the same feature set; if drift
+  persists after that refit, pause scoring until a new model is
+  validated.  
 - **Performance:** Recompute accuracy, balanced accuracy, and AUC
-  quarterly; retrain if accuracy < 0.80 or AUC < 0.78.  
+  quarterly. If accuracy < 0.80 or AUC < 0.78 in a period, recalibrate
+  the classification threshold on the latest data and re-score. If the
+  next period remains below these thresholds, retrain on the recent
+  two–three periods. If, after retraining, metrics stay below 0.78 AUC
+  or 0.75 accuracy for two straight checks, retire the champion and
+  fall back to the challenger until a replacement is validated.  
 - **Stability:** Monitor calibration (Hosmer-Lemeshow) and confusion
-  matrix balance; investigate rising false negatives (missed survivors).  
+  matrix balance; investigate rising false negatives (missed survivors).
+  If Hosmer-Lemeshow p < 0.05 or the false negative rate rises >20%
+  versus baseline, adjust the threshold; if the next review shows the
+  same issue, retrain. If false negatives remain elevated after the
+  retrain, halt deployment until resolved.  
 - **Process:** Freeze scoring code, log model version/seed, and maintain
-  challenger comparisons on new data.
+  challenger comparisons on new data. If the champion is paused, route
+  scoring to the challenger or a simple baseline until the fix is
+  validated.
 
 ## VIII. Conclusion (5 points)
 
