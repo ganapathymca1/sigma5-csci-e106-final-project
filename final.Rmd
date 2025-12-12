@@ -1,6 +1,6 @@
 ---
-title: "HARVARD EXTENSION SCHOOL"
-subtitle: "Titanic Survival Classification: Group Project Report"
+title: "HES CSCI E-106 Statistical Data Modeling (Fall 2025 Semester)"
+subtitle: "Titanic Survival Classification: Group 5 (Sigma 5) Project Report"
 author:
 - Aljazi Al Maghlouth
 - Anjan Chakravarti
@@ -10,7 +10,7 @@ author:
 - Julie Lander
 - Khatanbaatar Orkhon
 - Max Amiesimaka
-tags: [logistic regression, decision tree, SVM, classification]
+tags: [logistic regression, decision tree, classification]
 abstract: |
   We build a champion/benchmark modeling solution to predict passenger
   survival on the RMS Titanic. The analysis covers exploratory data
@@ -50,7 +50,6 @@ library(caret)
 library(pROC)
 library(ResourceSelection)
 library(vcd)
-library(e1071)
 
 titanic_raw <- read_csv("Titanic_Survival_Data.csv", show_col_types = FALSE)
 ```
@@ -70,7 +69,7 @@ accuracy drops below 0.80 or when inputs shift beyond training
 percentiles. Key limitations include missing values (age, fare, cabin),
 historical bias, and simplified imputations.
 
-## I. Introduction (5 points)
+## I. Introduction
 
 This project classifies whether a passenger survived the Titanic
 disaster using readily available features (class, sex, age, family
@@ -79,14 +78,14 @@ methods: logistic regression (champion) and decision tree (challenger).
 Success is defined by accurate and explainable survival predictions that
 generalize to the hold-out test set.
 
-## II. Description of the Data and Quality (15 points)
+## II. Description of the Data and Quality
 
 The dataset contains 1,310 observations and 14 original variables. Key
 predictors are a mix of categorical (class, sex, embarked) and numeric
 (age, fare, family counts). Several variables contain notable missing
 values (age, cabin, boat, body, and home destination).
 
-```{r data_overview}
+```{r data_overview, comment="", echo=FALSE}
 glimpse(titanic_raw)
 
 titanic_raw %>%
@@ -152,25 +151,19 @@ clean_titanic %>%
   theme_minimal()
 
 clean_titanic %>%
-  filter(!is.na(pclass), !is.na(survived)) %>%
   ggplot(aes(x = pclass, fill = survived)) +
   geom_bar(position = "fill") +
   scale_y_continuous(labels = scales::percent_format()) +
-  labs(
-    title = "Figure 2. Survival share by passenger class",
-    x = "Class", y = "Percent"
-  ) +
+  labs(title = "Figure 2. Survival share by passenger class",
+       x = "Class", y = "Percent") +
   theme_minimal()
 
 clean_titanic %>%
-  filter(!is.na(sex), !is.na(survived)) %>%
   ggplot(aes(x = sex, fill = survived)) +
   geom_bar(position = "fill") +
   scale_y_continuous(labels = scales::percent_format()) +
-  labs(
-    title = "Figure 3. Survival share by sex",
-    x = "Sex", y = "Percent"
-  ) +
+  labs(title = "Figure 3. Survival share by sex",
+       x = "Sex", y = "Percent") +
   theme_minimal()
 ```
 
@@ -178,7 +171,7 @@ clean_titanic %>%
 passengers, women, and higher classes. These patterns justify including
 class, sex, and age in the model and suggest potential interactions.
 
-## III. Model Development Process (15 points)
+## III. Model Development Process
 
 ### Train/Test Split
 
@@ -235,22 +228,7 @@ rpart.plot(tree_model, main = "Figure 4. Decision tree challenger")
 passage has low survival). It trades probability granularity for
 transparency.
 
-### Challenger: SVM
-
-```{r svm_model}
-set.seed(1023)
-svm_model <- svm(survived ~ pclass + sex + age + family_size + fare + embarked, 
-                  data = titanic_train, 
-                  type = 'C-classification', 
-                  kernel = 'radial',
-                  probability = TRUE,
-                  gamma = 0.1)
-summary(svm_model)
-```
-
-**Interpretation**: SVM uses a radial basis function kernel (gaussian) to capture nonlinear relationships between predictors. Achieves similar results to the other models but suffers in explainability. 
-
-## IV. Model Performance Testing (15 points)
+## IV. Model Performance Testing
 
 ### 4.1 Model Selection and Diagnostics
 
@@ -332,11 +310,6 @@ logit_pred_class <- factor(logit_pred_class, levels = c("Died", "Survived"))
 
 # Decision tree predictions
 tree_pred_class <- predict(tree_model, newdata = titanic_test, type = "class")
-
-# SVM predictions
-svm_pred_class <- predict(svm_model, newdata = titanic_test)
-svm_pred_prob_attr <- predict(svm_model, newdata = titanic_test, probability = TRUE)
-svm_pred_prob <- attr(svm_pred_prob_attr, "probabilities")[, "Survived"]
 ```
 
 #### Confusion Matrices
@@ -344,7 +317,6 @@ svm_pred_prob <- attr(svm_pred_prob_attr, "probabilities")[, "Survived"]
 ```{r confusion_matrices}
 logit_cm <- confusionMatrix(logit_pred_class, titanic_test$survived, positive = "Survived")
 tree_cm  <- confusionMatrix(tree_pred_class, titanic_test$survived,  positive = "Survived")
-svm_cm   <- confusionMatrix(svm_pred_class, titanic_test$survived, positive = "Survived")
 
 logit_cm$table
 logit_cm$overall
@@ -353,24 +325,20 @@ logit_cm$byClass
 tree_cm$table
 tree_cm$overall
 tree_cm$byClass
-
-svm_cm$table
-svm_cm$overall
 ```
 
 #### Performance Metrics Comparison
 
 ```{r metrics_comparison, fig.width=7, fig.height=6, fig.align='left'}
 metrics_comparison <- data.frame(
-  Model = c("Logistic Regression", "Decision Tree", "SVM"),
-  Accuracy = c(logit_cm$overall["Accuracy"], tree_cm$overall["Accuracy"], svm_cm$overall["Accuracy"]),
-  Sensitivity = c(logit_cm$byClass["Sensitivity"], tree_cm$byClass["Sensitivity"], svm_cm$byClass["Sensitivity"]),
-  Specificity = c(logit_cm$byClass["Specificity"], tree_cm$byClass["Specificity"], svm_cm$byClass["Specificity"]),
-  Precision = c(logit_cm$byClass["Precision"], tree_cm$byClass["Precision"], svm_cm$byClass["Precision"]),
-  F1_Score = c(logit_cm$byClass["F1"], tree_cm$byClass["F1"], svm_cm$byClass["F1"]),
+  Model = c("Logistic Regression", "Decision Tree"),
+  Accuracy = c(logit_cm$overall["Accuracy"], tree_cm$overall["Accuracy"]),
+  Sensitivity = c(logit_cm$byClass["Sensitivity"], tree_cm$byClass["Sensitivity"]),
+  Specificity = c(logit_cm$byClass["Specificity"], tree_cm$byClass["Specificity"]),
+  Precision = c(logit_cm$byClass["Precision"], tree_cm$byClass["Precision"]),
+  F1_Score = c(logit_cm$byClass["F1"], tree_cm$byClass["F1"]),
   Balanced_Accuracy = c(logit_cm$byClass["Balanced Accuracy"],
-                        tree_cm$byClass["Balanced Accuracy"],
-                        svm_cm$byClass["Balanced Accuracy"])
+                        tree_cm$byClass["Balanced Accuracy"])
 )
 
 metrics_comparison %>%
@@ -388,18 +356,13 @@ tree_pred_prob <- predict(tree_model, newdata = titanic_test, type = "prob")[, "
 tree_roc <- roc(titanic_test$survived, tree_pred_prob, levels = c("Died", "Survived"))
 tree_auc <- auc(tree_roc)
 
-svm_roc <- roc(titanic_test$survived, svm_pred_prob, levels = c("Died", "Survived"))
-svm_auc <- auc(svm_roc)
-
 plot(logit_roc, col = "blue", lwd = 2,
      main = "Figure 6. ROC Curves: Model Comparison")
 plot(tree_roc, col = "red", lwd = 2, add = TRUE)
-plot(svm_roc, col = "green", lwd = 2, add = TRUE)
 legend("bottomright",
        legend = c(paste("Logistic Regression (AUC =", round(logit_auc, 3), ")"),
-                  paste("Decision Tree (AUC =", round(tree_auc, 3), ")"),
-                  paste("SVM (AUC =", round(svm_auc, 3), ")")),
-       col = c("blue", "red", "green"), lwd = 2)
+                  paste("Decision Tree (AUC =", round(tree_auc, 3), ")")),
+       col = c("blue", "red"), lwd = 2)
 ```
 
 #### Goodness-of-Fit
@@ -452,15 +415,13 @@ tidy(logit_step, exponentiate = TRUE, conf.int = TRUE) %>%
                              "z", "p-value", "CI Lower", "CI Upper"))
 ```
 
-## V. Challenger Models (15 points)
+## V. Challenger Models
 
 - Decision tree (rpart) built with the same predictors.
 - Provides transparent decision rules but slightly lower AUC/accuracy.
 - Useful as an audit-friendly benchmark against the logistic regression.
-- SVM uses higher dimensions to capture nonlinear relationships between predictors.
-- Highest AUC, can provide decent predictive power but lacks explainability. 
 
-## VI. Model Limitations and Assumptions (15 points)
+## VI. Model Limitations and Assumptions
 
 - Missing data handled with median imputations; alternative methods
   (e.g., multiple imputation) could shift coefficients.  
@@ -470,7 +431,7 @@ tidy(logit_step, exponentiate = TRUE, conf.int = TRUE) %>%
   predictors and absence of strong multicollinearity.  
 - Outliers may influence coefficients despite Cook's distance checks.
 
-## VII. Ongoing Model Monitoring Plan (5 points)
+## VII. Ongoing Model Monitoring Plan
 
 - **Data drift:** Track distributions of `pclass`, `sex`, `fare`, and
   `family_size`; trigger review if shifts exceed training
@@ -498,7 +459,7 @@ tidy(logit_step, exponentiate = TRUE, conf.int = TRUE) %>%
   scoring to the challenger or a simple baseline until the fix is
   validated.
 
-## VIII. Conclusion (5 points)
+## VIII. Conclusion
 
 The stepwise logistic regression is the champion model: it delivers
 strong discriminatory power, balanced performance, and interpretable
@@ -507,66 +468,93 @@ trails slightly in AUC and accuracy. Monitoring should focus on input
 drift and sustained predictive performance to ensure continued fitness
 for purpose.
 
-## Bibliography (7 points)
+This project developed and evaluated statistical classification models to predict passenger",
+"survival on the RMS Titanic. After a comprehensive analysis of data quality, exploratory",
+"patterns, model diagnostics, and test-set performance, the stepwise logistic regression",
+"model emerged as the champion model. Its strengths include stable and interpretable",
+"coefficients, strong discriminatory power (AUC = 0.81), balanced accuracy, and robustness",
+"against multicollinearity. The model effectively captured key survival determinants such as",
+"passenger class, sex, age, family structure, and port of embarkation.
 
-- "Titanic: Machine Learning from Disaster," Kaggle.
-- James, Witten, Hastie, Tibshirani. *An Introduction to Statistical
-  Learning* (Ch. 4–6).
-- Kuhn, Johnson. *Applied Predictive Modeling*.
+The decision tree served as a transparent challenger model, offering rule-based explanations",
+"that align with well-known Titanic survival dynamics (e.g., higher survival rates among women",
+"and passengers in first class). Although the tree performed competitively with accuracy and",
+"AUC close to the logistic regression it exhibited slightly lower generalization performance on",
+"the hold-out test set, justifying its role as a benchmark rather than the primary model.
 
-## Appendix (3 points)
+Overall, the modeling framework demonstrates that demographic and ticket-related features",
+"provide meaningful predictive signal for survival classification. The results highlight the",
+"importance of rigorous feature engineering, proper handling of missing data, and balanced",
+"evaluation across accuracy, sensitivity, specificity, and AUC. While the champion model is well",
+"suited for this dataset, limitations such as historical bias, imputation uncertainty, and",
+"non-linear effects suggest opportunities for future enhancement using ensemble methods or",
+"calibrated probability models.
+
+The final recommendation is to adopt the logistic regression model as the primary forecasting",
+"tool, supported by ongoing monitoring of input drift, predictive performance decay, and model",
+"assumptions. With appropriate governance, this modeling solution is fit for purpose and",
+"provides a reproducible, transparent, and statistically grounded approach to survival",
+"prediction on the Titanic dataset.
+
+```{r  comment="", echo=FALSE}
+
+```
+## Bibliography
+
+Kaggle. (n.d.). *Titanic: Machine Learning from Disaster*. Retrieved from [https://www.kaggle.com/competitions/titanic](https://www.kaggle.com/competitions/titanic). Used as the primary source of the Titanic survival dataset and baseline feature descriptions.
+
+James, G., Witten, D., Hastie, T., & Tibshirani, R. (2021). *An Introduction to Statistical Learning with Applications in R* (2nd ed.). Springer. Key reference for logistic regression, model selection, and performance evaluation concepts applied in this report.
+
+Kuhn, M., & Johnson, K. (2013). *Applied Predictive Modeling*. Springer. Used for guidance on train/test splitting, confusion matrices, ROC curves, AUC, and model comparison in classification problems.
+
+Hosmer, D. W., Lemeshow, S., & Sturdivant, R. X. (2013). *Applied Logistic Regression* (3rd ed.). Wiley. Reference for interpreting odds ratios, assessing goodness-of-fit, and applying the Hosmer–Lemeshow test for the champion logistic model.
+
+Harrell, F. E. (2015). *Regression Modeling Strategies* (2nd ed.). Springer. Conceptual support for model building, handling of nonlinearity, and the use of diagnostic plots for residuals and influential observations.
+
+Kuhn, M. (2008). *caret: Classification and Regression Training* [R package]. Comprehensive R framework used for confusion matrices and model performance metrics; see CRAN documentation for implementation details.
+
+Robin, X., et al. (2011). pROC: an open-source package for R and S+ to analyze and compare ROC curves. *BMC Bioinformatics*, 12(77). Used for ROC curve plotting and AUC computation for the logistic regression and decision tree models.
+
+Therneau, T., & Atkinson, B. (2024). *rpart: Recursive Partitioning and Regression Trees* [R package]. Implemented the decision tree challenger model for survival classification and rule-based interpretation.
+
+Milborrow, S. (2024). *rpart.plot: Plot 'rpart' Models* [R package]. Used to visualize the decision tree structure and communicate simple, interpretable survivor/non-survivor rules.
+
+R Core Team. (2024). *R: A Language and Environment for Statistical Computing*. R Foundation for Statistical Computing, Vienna, Austria. The statistical computing environment used for all data manipulation, modeling, and graphics in this project.
+
+## Appendix
 
 ### A1. Additional Exploratory Data Analysis
 ```{r comment="", echo=FALSE}
-clean_titanic %>%
-  filter(!is.na(survived), !is.na(age)) %>%
-  ggplot(aes(x = survived, y = age, fill = survived)) +
-  geom_boxplot(alpha = 0.7) +
-  labs(
-    title = "Appendix Figure A1. Age by Survival Status",
-    x = "Survival", 
-    y = "Age"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
+ggplot(clean_titanic, aes(x = survived, y = age, fill = survived)) +
+geom_boxplot(alpha = 0.7) +
+labs(title = "Appendix Figure A1. Age by Survival Status",
+x = "Survival", y = "Age") +
+theme_minimal() +
+theme(legend.position = "none")
+
+```
+
+```{r comment="", echo=FALSE}
+ggplot(clean_titanic, aes(x = survived, y = fare, fill = survived)) +
+geom_boxplot(alpha = 0.7) +
+coord_cartesian(ylim = c(0, quantile(clean_titanic$fare, 0.95, na.rm = TRUE))) +
+labs(title = "Appendix Figure A2. Fare by Survival Status (Truncated at 95th Percentile)",
+x = "Survival", y = "Fare") +
+theme_minimal() +
+theme(legend.position = "none")
 
 ```
 
 ```{r comment="", echo=FALSE}
 clean_titanic %>%
-  filter(!is.na(survived), !is.na(fare)) %>%
-  ggplot(aes(x = survived, y = fare, fill = survived)) +
-  geom_boxplot(alpha = 0.7) +
-  coord_cartesian(
-    ylim = c(
-      0,
-      quantile(clean_titanic$fare, 0.95, na.rm = TRUE)
-    )
-  ) +
-  labs(
-    title = "Appendix Figure A2. Fare by Survival Status (Truncated at 95th Percentile)",
-    x = "Survival", 
-    y = "Fare"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
-
-```
-
-```{r comment="", echo=FALSE}
-clean_titanic %>%
-  filter(!is.na(pclass), !is.na(sex), !is.na(survived)) %>%
-  count(pclass, sex, survived) %>%
-  ggplot(aes(x = pclass, y = n, fill = survived)) +
-  geom_col(position = "fill") +
-  facet_wrap(~ sex) +
-  scale_y_continuous(labels = scales::percent_format()) +
-  labs(
-    title = "Appendix Figure A3. Survival Share by Class and Sex",
-    x = "Passenger Class", 
-    y = "Percent"
-  ) +
-  theme_minimal()
+count(pclass, sex, survived) %>%
+ggplot(aes(x = pclass, y = n, fill = survived)) +
+geom_col(position = "fill") +
+facet_wrap(~ sex) +
+scale_y_continuous(labels = scales::percent_format()) +
+labs(title = "Appendix Figure A3. Survival Share by Class and Sex",
+x = "Passenger Class", y = "Percent") +
+theme_minimal()
 
 ```
 
