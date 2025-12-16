@@ -693,7 +693,3 @@ cat(strwrap(comment_text, width = 70), sep = "\n")
 ```{r}
 
 ```
-
-```{r}
-
-```
